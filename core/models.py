@@ -25,13 +25,6 @@ RRULES_KEYWORDS=("wkst", "count", "until", "bysetpos", "bymonth", "bymonthday",
                  "byyearday", "byweekno", "byweekday", "byhour", "byminute", "bysecond",
                  "byeaster")
 
-#TODO: tasks states need more though
-TASK_STATES=((0, "Not planned"),
-             (1, "Planned"),
-             (2, "Running"),
-             (3, "Fisnished"),
-             (4, "Failed"))
-
 class Application(models.Model):
     """A consistent set of chain and tasks that represent the
     workplan of an application"""
@@ -46,8 +39,8 @@ class Condition(models.Model):
 
 class TimeCondition(Condition):
     """A condition based on time"""
-    min_time=models.TimeField(null=True, blank=True)
-    max_time=models.TimeField(null=True, blank=True)
+    min_time=models.TimeField(blank=True)
+    max_time=models.TimeField(blank=True)
 
     def __unicode__(self):
         if self.min_time and self.max_time:
@@ -56,6 +49,8 @@ class TimeCondition(Condition):
             return u"%s < x" % self.min_time
         elif self.max_time:
             return u"x < %s" % self.max_time
+        else:
+            return "Undefined"
 
     def isTrue(self, refTime=None):
         """
@@ -118,6 +113,7 @@ class Chain(models.Model):
     application=models.ForeignKey(Application)
     start_activity=models.ForeignKey(Activity, related_name="starting_chain_set")
     end_activity=models.ForeignKey(Activity, related_name="ending_chain_set")
+    current_activity=models.ForeignKey(Activity, related_name="current_chain_set", blank=True, null=True)
 
     def __unicode__(self):
         return self.name
@@ -164,7 +160,9 @@ class Recurrence(models.Model):
 class TaskProfile(models.Model):
     """A task profile define sets of reccurence and parameters"""
     name=models.CharField(max_length=200)
-    recurrence=models.ForeignKey(Recurrence, null=True)
+    recurrence=models.ForeignKey(Recurrence, blank=True, null=True)
+    stop_if_last_run_failed=models.BooleanField(default=True)
+
     #TODO: define here parameters set for task profile
 
 class Task(models.Model):
@@ -173,26 +171,35 @@ class Task(models.Model):
     A chain without task is not planned but can be launched by a specific event"""
     name=models.CharField(max_length=200)
     chain=models.ForeignKey(Chain)
-    current_activity=models.ForeignKey(Activity, null=True)
     profile=models.ForeignKey(TaskProfile)
-    state=models.IntegerField(choices=TASK_STATES)
     disable=models.BooleanField(default=False)
+    next_run=models.DateTimeField(blank=True, null=True)
+    last_run=models.DateTimeField(blank=True, null=True)
+    last_run_failed=models.BooleanField(default=False)
 
     def __unicode__(self):
         return self.name
 
-    def nextRun(self):
-        """Compute the next date to run this task
-        @return: datetime.datetime of next run or None if there's no next run"""
+    def computeNextRun(self):
+        """Compute the next date to run this task and store it in next_run field"""
         if self.profile.recurrence is None:
-            return None
-        #TODO: don't use now() but a reference datetime
-        return self.profile.recurrence.get_rrule().after(datetime.datetime.now())
+            self.next_run=None
+            return
+        if self.last_run:
+            dateRef=self.last_run
+        else:
+            # Never run, use now as reference for next run
+            print "no last run date, using now as reference"
+            dateRef=datetime.datetime.now()
+        self.next_run=self.profile.recurrence.get_rrule().after(dateRef)
+        print "next run: %s" % self.next_run
 
-    def nextActivity(self):
-        """Compute the next activity to run once current one finished
-        @return: Activity"""
-        pass
+    def isPlanned(self):
+        """Check if task is planned"""
+        if self.profile.recurrence:
+            return True
+        else:
+            return False 
 
 class Event(models.Model):
     """An event is a communication message
