@@ -37,10 +37,8 @@ class Application(models.Model):
     workplan of an application"""
     name=models.CharField(max_length=50)
 
-class Chain(models.Model):
-    """A succession of activities with defined conditions."""
-    name=models.CharField(max_length=200)
-    application=models.ForeignKey(Application)
+    def __unicode__(self):
+        return self.name
 
 class Condition(models.Model):
     """A condition is a rule to start the next activity in a chain."""
@@ -94,13 +92,15 @@ class Activity(models.Model):
     """The most unitary peace of work.
     An activity define parameters needed to launch properly a job (see below)."""
     name=models.CharField(max_length=200)
-    chain=models.ForeignKey(Chain)
-    startingConditions=models.ManyToManyField(Condition)
+    startingConditions=models.ManyToManyField(Condition, blank=True)
+
+    def __unicode__(self):
+        return self.name
 
 class ShellActivity(Activity):
     """An activity launched via the system shell"""
     # Env varchar should be changed into a list of env variable structured in groups
-    env=models.CharField(max_length=2000)
+    env=models.CharField(max_length=2000, blank=True)
     command_line=models.CharField(max_length=2000) # Should be more elaborated (split command and arguments)
 
 class WebServiceActivity(Activity):
@@ -112,6 +112,16 @@ class StoredProcedureActivity(Activity):
     procedure_name=models.CharField(max_length=2000)
     connection_string=models.CharField(max_length=200)
 
+class Chain(models.Model):
+    """A succession of activities with defined conditions."""
+    name=models.CharField(max_length=200)
+    application=models.ForeignKey(Application)
+    start_activity=models.ForeignKey(Activity, related_name="starting_chain_set")
+    end_activity=models.ForeignKey(Activity, related_name="ending_chain_set")
+
+    def __unicode__(self):
+        return self.name
+
 class Recurrence(models.Model):
     """Define the recurrence of a task
     Simple recurrence for now (like a dateutil.rrule.rrule)
@@ -120,6 +130,9 @@ class Recurrence(models.Model):
     frequency = models.IntegerField(max_length=20, choices=FREQUENCIES)
     start_date=models.DateTimeField()
     params = models.TextField(null=True, blank=True)
+
+    def __unicode__(self):
+        return "%s (%s)" % (self.name, self.get_frequency_display())
 
     def get_rrule(self):
         """Create rrule object from its Recurrence representation
@@ -160,9 +173,13 @@ class Task(models.Model):
     A chain without task is not planned but can be launched by a specific event"""
     name=models.CharField(max_length=200)
     chain=models.ForeignKey(Chain)
+    current_activity=models.ForeignKey(Activity, null=True)
     profile=models.ForeignKey(TaskProfile)
     state=models.IntegerField(choices=TASK_STATES)
     disable=models.BooleanField(default=False)
+
+    def __unicode__(self):
+        return self.name
 
     def nextRun(self):
         """Compute the next date to run this task
@@ -171,6 +188,11 @@ class Task(models.Model):
             return None
         #TODO: don't use now() but a reference datetime
         return self.profile.recurrence.get_rrule().after(datetime.datetime.now())
+
+    def nextActivity(self):
+        """Compute the next activity to run once current one finished
+        @return: Activity"""
+        pass
 
 class Event(models.Model):
     """An event is a communication message
