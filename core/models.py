@@ -21,9 +21,16 @@ FREQUENCIES=((YEARLY,   "Yearly"),
              (MINUTELY, "Minutely"),
              (SECONDLY, "Secondly"))
 
-RRULES_KEYWORDS=("dtstart", "wkst", "count", "until", "bysetpos", "bymonth", "bymonthday",
+RRULES_KEYWORDS=("wkst", "count", "until", "bysetpos", "bymonth", "bymonthday",
                  "byyearday", "byweekno", "byweekday", "byhour", "byminute", "bysecond",
                  "byeaster")
+
+#TODO: tasks states need more though
+TASK_STATES=((0, "Not planned"),
+             (1, "Planned"),
+             (2, "Running"),
+             (3, "Fisnished"),
+             (4, "Failed"))
 
 class Application(models.Model):
     """A consistent set of chain and tasks that represent the
@@ -41,7 +48,22 @@ class Condition(models.Model):
 
 class TimeCondition(Condition):
     """A condition based on time"""
-    pass
+    min_date=models.DateTimeField(null=True)
+    max_date=models.DateTimeField(null=True)
+
+    def isTrue(self, refDate=None):
+        """
+        @param date: Use date to resolve condition. Default is now()
+        @type date: datetime.datetime
+        @return: bool"""
+        result=True
+        if refDate is None:
+            refDate=datetime.datetime.now()
+        if self.min_date:
+            result=result and (self.min_date < refDate)
+        if self.max_date:
+            result=result and (self.max_date > refDate)
+        return result
 
 class FlowCondition(Condition):
     """A condition based on activity success, failure"""
@@ -50,6 +72,16 @@ class FlowCondition(Condition):
 class ExclusionCondition(Condition):
     """A condition used  to prevent concurent running of some activities"""
     pass
+
+class OrCondition(Condition):
+    """A condition that is true if any of its sub condition is True"""
+    subConditions=models.ManyToManyField(Condition, related_name="orSubConditions")
+
+    def isTrue(self):
+        result=True
+        for condition in self.subConditions:
+            result=result and condition.isTrue()
+        return result
 
 class Activity(models.Model):
     """The most unitary peace of work.
@@ -79,21 +111,22 @@ class Recurrence(models.Model):
     More complex things could be done as midterm goal like rruleset (set of rules)"""
     name=models.CharField(max_length=200)
     frequency = models.IntegerField(max_length=20, choices=FREQUENCIES)
+    start_date=models.DateTimeField()
     params = models.TextField(null=True, blank=True)
 
     def get_rrule(self):
         """Create rrule object from its Recurrence representation
         @return: dateutil.rrule.rrule instance"""
+        parDict={}
         try:
-            parDict=eval(self.params)
+            if self.params:
+                parDict=eval(self.params)
         except Exception, e:
-            parDict={}
-            print e
+            print "Bad recurrence parameter: %s" % e
             #TODO: should we log an exception or break upstream ?
             # Bad data here means set_params is buggy or was not used to insert data
-        if not isinstance(parDict, dict):
-            #TODO: same question as above
-            return {}
+        parDict["cache"]=True # Allow rrule cache to optimise multiple access to same rrule
+        parDict["dtstart"]=self.start_date
         return rrule(self.frequency, **parDict)
 
     def set_rrule(self, rule):
@@ -102,17 +135,17 @@ class Recurrence(models.Model):
         if not isinstance(rule, rrule):
             raise Exception("A dateutil.rrule.rrule object if requiered")
         self.frequency=rule._freq
+        self.start_date=rule._dtstart
         parDict={}
         for key in RRULES_KEYWORDS:
             parDict[key]=getattr(rule, "_"+key)
         self.params=repr(parDict) # Use str representation of the dict
 
 class TaskProfile(models.Model):
-    """A task profile define planification"""
+    """A task profile define sets of reccurence and parameters"""
     name=models.CharField(max_length=200)
     recurrence=models.ForeignKey(Recurrence, null=True)
-    start_date=models.DateTimeField()
-    end_date=models.DateTimeField()
+    #TODO: define here parameters set for task profile
 
 class Task(models.Model):
     """A task represent the planification of a chain.
@@ -121,6 +154,16 @@ class Task(models.Model):
     name=models.CharField(max_length=200)
     chain=models.ForeignKey(Chain)
     profile=models.ForeignKey(TaskProfile)
+    state=models.IntegerField(choices=TASK_STATES)
+    disable=models.BooleanField(default=False)
+
+    def nextRun(self):
+        """Compute the next date to run this task
+        @return: datetime.datetime of next run or None if there's no next run"""
+        if self.profile.recurrence is None:
+            return None
+        #TODO: don't use now() but a reference datetime
+        return self.profile.recurrence.get_rrule().after(datetime.datetime.now())
 
 class Event(models.Model):
     """An event is a communication message
@@ -131,7 +174,7 @@ class Event(models.Model):
         a call to the event web service
     An event is always received by a job scheduler
     An event can be used to fire up a task."""
-    creation_date=models.DateField()
-    done_date=models.DateField()
+    creation_date=models.DateTimeField()
+    done_date=models.DateTimeField()
     task=models.ForeignKey(Task) # The targeted task
     done=models.BooleanField(default=False) # Do we need more that two state ?
