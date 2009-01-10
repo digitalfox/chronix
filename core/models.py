@@ -48,21 +48,28 @@ class Condition(models.Model):
 
 class TimeCondition(Condition):
     """A condition based on time"""
-    min_date=models.DateTimeField(null=True)
-    max_date=models.DateTimeField(null=True)
+    min_time=models.TimeField(null=True, blank=True)
+    max_time=models.TimeField(null=True, blank=True)
 
-    def isTrue(self, refDate=None):
+    def __unicode__(self):
+        if self.min_time and self.max_time:
+            return u"%s < x < %s" % (self.min_time, self.max_time)
+        elif self.min_time:
+            return u"%s < x" % self.min_time
+        elif self.max_time:
+            return u"x < %s" % self.max_time
+
+    def isTrue(self, refTime=None):
         """
-        @param date: Use date to resolve condition. Default is now()
-        @type date: datetime.datetime
+        @param refTime: Use time to resolve condition. Default is now()
+        @type date: datetime.time
         @return: bool"""
         result=True
-        if refDate is None:
-            refDate=datetime.datetime.now()
-        if self.min_date:
-            result=result and (self.min_date < refDate)
-        if self.max_date:
-            result=result and (self.max_date > refDate)
+        refTime=refTime or datetime.datetime.now().time()
+        if self.min_time:
+            result=result and (self.min_time < refTime)
+        if self.max_time:
+            result=result and (self.max_time > refTime)
         return result
 
 class FlowCondition(Condition):
