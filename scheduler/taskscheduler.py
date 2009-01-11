@@ -21,42 +21,70 @@ from django.core.management import setup_environ
 import settings
 setup_environ(settings)
 
+# Django imports
+from django.db import transaction
+
 # Chronix imports
 from chronix.core.models import Task
 from chronix.scheduler.models import LaunchedTask
 
 SCHEDULE_INTERVAL=1 # In seconds
 
+@transaction.commit_manually
 def processTasks():
+    """Main task scheduler loop.
+    All enabled tasks are processed and launched if needed
+    """
+    #TODO: add a smart way to stop or suspend the loop
     while True:
         now=datetime.now()
         for task in Task.objects.filter(disable=False):
-            taskNeedSave=False
-            print "processing task %s" % task.name
-            if task.profile.stop_if_last_run_failed and task.last_run_failed:
-                print "Don't run this task because last run failed"
-                break
-            if not task.next_run and task.isPlanned():
-                task.computeNextRun()
-                taskNeedSave=True
-            if task.next_run and task.next_run < now:
-                print "Launch task!"
-                # Launch the task by creating a LaunchedTask
-                launchedTask=LaunchedTask()
-                launchedTask.task=task # Reference task
-                launchedTask.state="FIRED"
-                launchedTask.planned_launch_date=task.next_run
-                launchedTask.real_launch_date=now
-                launchedTask.save()
-
-                # Update task for its next run
-                task.last_run=task.next_run
-                task.computeNextRun()
-                taskNeedSave=True
-            if taskNeedSave:
-                #TODO: use transaction to commit in the same time task and launched task
-                task.save()
+            #print "processing task %s" % task.name
+            try:
+                processTask(task, now)
+            except Exception, e:
+                print "Got exception while processing task %s.\n%s" % (task.name, e)
         sleep(SCHEDULE_INTERVAL)
+
+@transaction.commit_on_success
+def processTask(task, refDate):
+    """Process scheduling of a task. Launch it if needed.
+    @param task: the task to process
+    @type task: chronix.core.Task
+    @param refDate: the date used to schedule. Usually it's now
+    @type refDate: datetime.datetime
+    """
+    taskNeedSave=False
+    if task.profile.stop_if_last_run_failed and task.last_run_failed:
+        print "Don't run this task because last run failed"
+        return
+    if not task.next_run and task.isPlanned():
+        task.computeNextRun()
+        taskNeedSave=True
+    if task.next_run and task.next_run < refDate:
+        print "Launch task %s" % task.name
+        launchTask(task, refDate)
+        # Update task for its next run
+        task.last_run=task.next_run
+        task.computeNextRun()
+        taskNeedSave=True
+
+    if taskNeedSave:
+        task.save()
+
+def launchTask(task, refDate):
+    """Launch a task by creating a LaunchedTask
+    @param task: task used to create the launchedTask. Task object is not modified.
+    @type task: chronix.core.Task
+    @param refDate: the date used to log real launch date.
+    @type refDate: datetime.datetime"""
+    # Create the launched task
+    launchedTask=LaunchedTask()
+    launchedTask.task=task # Reference task
+    launchedTask.state="FIRED"
+    launchedTask.planned_launch_date=task.next_run
+    launchedTask.real_launch_date=refDate
+    launchedTask.save()
 
 def main():
     processTasks()
