@@ -27,3 +27,17 @@ class LaunchedTask(models.Model):
     current_activity=models.ForeignKey(Activity, related_name="current_chain_set", blank=True, null=True)
     state=models.CharField(max_length=20, choices=LAUNCHED_TASK_STATES)
     task=models.ForeignKey(Task)
+
+class Event(models.Model):
+    """An event is a communication message
+    An event can be emited by:
+        a task when starting or ending
+        a call to the event CLI
+        a call to the event API
+        a call to the event web service
+    An event is always received by a job scheduler
+    An event can be used to fire up tasks."""
+    creation_date=models.DateTimeField()
+    done_date=models.DateTimeField()
+    task=models.ManyToManyField(Task) # The targeted task
+    done=models.BooleanField(default=False) # Do we need more that two state ?
