@@ -160,9 +160,10 @@ class TaskProfile(models.Model):
     """A task profile define sets of reccurence and parameters"""
     name=models.CharField(max_length=200)
     recurrence=models.ForeignKey(Recurrence, blank=True, null=True)
+    # Don't planned again this task if last run failed
     stop_if_last_run_failed=models.BooleanField(default=True)
-    #TODO: add a parameter that make a task forget old runs and only react to future occurences
-
+    # Forget old missed run and only fire up once when recover
+    forgot_misfire=models.BooleanField(default=False)
     #TODO: define here parameters set for task profile
 
 class Task(models.Model):
@@ -180,18 +181,29 @@ class Task(models.Model):
     def __unicode__(self):
         return self.name
 
-    def computeNextRun(self):
-        """Compute the next date to run this task and store it in next_run field"""
+    def computeNextRun(self, dateRef):
+        """Compute the next date to run this task and store it in next_run field
+        @param dateRef: reference date used for plannification. Usually now
+        @type dateRef: datetime.dateimte"""
         if self.profile.recurrence is None:
             self.next_run=None
             return
         if self.last_run:
-            dateRef=self.last_run
+            last_run=self.last_run
         else:
             # Never run, use now as reference for next run
             print "no last run date, using now as reference"
-            dateRef=datetime.datetime.now()
-        self.next_run=self.profile.recurrence.get_rrule().after(dateRef)
+            last_run=datetime.datetime.now()
+        rule=self.profile.recurrence.get_rrule()
+        miss=len(rule.between(last_run, dateRef))
+        if miss:
+            print "Miss %s execution since last run" % miss
+        if miss and self.profile.forgot_misfire:
+            # Run only last occurrence of the task between Date_ref and dateRed
+            self.next_run=rule.between(last_run, dateRef)[-1]
+        else:
+            # Run the next task in order since last run
+            self.next_run=rule.after(last_run)
         print "next run: %s" % self.next_run
 
     def isPlanned(self):

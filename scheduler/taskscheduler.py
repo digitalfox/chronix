@@ -40,7 +40,7 @@ def runTaskScheduler(taskSchedulerNode):
     while True:
         now=datetime.now()
         for task in taskSchedulerNode.tasks.filter(disable=False):
-            #print "processing task %s" % task.name
+            print "\n***********\nProcessing task %s" % task.name
             try:
                 processTask(task, now)
             except Exception, e:
@@ -60,14 +60,14 @@ def processTask(task, refDate):
         print "Don't run this task because last run failed"
         return
     if not task.next_run and task.isPlanned():
-        task.computeNextRun()
+        task.computeNextRun(refDate)
         taskNeedSave=True
     if task.next_run and task.next_run < refDate:
         print "Launch task %s" % task.name
         launchTask(task, refDate)
         # Update task for its next run
         task.last_run=task.next_run
-        task.computeNextRun()
+        task.computeNextRun(refDate)
         taskNeedSave=True
 
     if taskNeedSave:
