@@ -25,20 +25,21 @@ setup_environ(settings)
 from django.db import transaction
 
 # Chronix imports
-from chronix.core.models import Task
-from chronix.scheduler.models import LaunchedTask
+from chronix.scheduler.models import LaunchedTask, TaskSchedulerNode
 
-SCHEDULE_INTERVAL=1 # In seconds
+SCHEDULE_INTERVAL=2 # In seconds
 
 @transaction.commit_manually
-def processTasks():
+def runTaskScheduler(taskSchedulerNode):
     """Main task scheduler loop.
     All enabled tasks are processed and launched if needed
+    @param taskSchedulerNode: the task scheduler node used to filter tasks
+    @type taskSchedulerNode: TaskSchedulerNode
     """
     #TODO: add a smart way to stop or suspend the loop
     while True:
         now=datetime.now()
-        for task in Task.objects.filter(disable=False):
+        for task in taskSchedulerNode.tasks.filter(disable=False):
             #print "processing task %s" % task.name
             try:
                 processTask(task, now)
@@ -87,7 +88,17 @@ def launchTask(task, refDate):
     launchedTask.save()
 
 def main():
-    processTasks()
+    #TODO: handle that properly in conf.
+    # For now, taskScheduler naem is receive as argv[1]
+    try:
+        taskSchedulerNode=TaskSchedulerNode.objects.get(name=sys.argv[1])
+        runTaskScheduler(taskSchedulerNode)
+    except TaskSchedulerNode.DoesNotExist:
+        print "This task scheduler does not exist."
+        sys.exit(1)
+    except IndexError:
+        print "Task Scheduler name must be given in argument"
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

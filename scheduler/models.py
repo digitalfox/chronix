@@ -17,6 +17,19 @@ LAUNCHED_TASK_STATES=(("FIRED", "Fired up"),
                       ("SUCCESS", "Finished successfully"),
                       ("FAILURE", "Finished with failure"))
 
+class TaskSchedulerNode(models.Model):
+    """A taskSchedulerNode is in charge of computing tasks workplan
+    A set of task is affected to a taskScheduler. A task can be affected
+    to more than one scheduler - it then will be planned by each one.
+    One taskscheduler can feed one or more job scheduler"""
+    name=models.CharField(max_length=200)
+    tasks=models.ManyToManyField(Task)
+    running=models.BooleanField(default=False)
+    start_date=models.DateTimeField(null=True, blank=True)
+
+    def __unicode__(self):
+        return self.name
+
 class LaunchedTask(models.Model):
     """A launched task represent a task that has been launched
     A task can have multiple launched task that represent distinct launched

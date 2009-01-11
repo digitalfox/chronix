@@ -12,6 +12,7 @@ repository application
 
 from django.contrib import admin
 
-from chronix.scheduler.models import LaunchedTask
+from chronix.scheduler.models import LaunchedTask, TaskSchedulerNode
 
 admin.site.register(LaunchedTask)
+admin.site.register(TaskSchedulerNode)
