@@ -113,7 +113,6 @@ class Chain(models.Model):
     application=models.ForeignKey(Application)
     start_activity=models.ForeignKey(Activity, related_name="starting_chain_set")
     end_activity=models.ForeignKey(Activity, related_name="ending_chain_set")
-    current_activity=models.ForeignKey(Activity, related_name="current_chain_set", blank=True, null=True)
 
     def __unicode__(self):
         return self.name
@@ -162,6 +161,7 @@ class TaskProfile(models.Model):
     name=models.CharField(max_length=200)
     recurrence=models.ForeignKey(Recurrence, blank=True, null=True)
     stop_if_last_run_failed=models.BooleanField(default=True)
+    #TODO: add a parameter that make a task forget old runs and only react to future occurences
 
     #TODO: define here parameters set for task profile
 

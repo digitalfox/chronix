@@ -77,5 +77,6 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.sites',
     'django.contrib.admin',
-    'chronix.core'
+    'chronix.core',
+    'chronix.scheduler'
 )

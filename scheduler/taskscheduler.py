@@ -23,6 +23,7 @@ setup_environ(settings)
 
 # Chronix imports
 from chronix.core.models import Task
+from chronix.scheduler.models import LaunchedTask
 
 SCHEDULE_INTERVAL=1 # In seconds
 
@@ -39,11 +40,21 @@ def processTasks():
                 task.computeNextRun()
                 taskNeedSave=True
             if task.next_run and task.next_run < now:
-                print "Should run !"
+                print "Launch task!"
+                # Launch the task by creating a LaunchedTask
+                launchedTask=LaunchedTask()
+                launchedTask.task=task # Reference task
+                launchedTask.state="FIRED"
+                launchedTask.planned_launch_date=task.next_run
+                launchedTask.real_launch_date=now
+                launchedTask.save()
+
+                # Update task for its next run
                 task.last_run=task.next_run
                 task.computeNextRun()
                 taskNeedSave=True
             if taskNeedSave:
+                #TODO: use transaction to commit in the same time task and launched task
                 task.save()
         sleep(SCHEDULE_INTERVAL)
 
