@@ -32,6 +32,9 @@ def processTasks():
         for task in Task.objects.filter(disable=False):
             taskNeedSave=False
             print "processing task %s" % task.name
+            if task.profile.stop_if_last_run_failed and task.last_run_failed:
+                print "Don't run this task because last run failed"
+                break
             if not task.next_run and task.isPlanned():
                 task.computeNextRun()
                 taskNeedSave=True
