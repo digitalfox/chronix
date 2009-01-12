@@ -56,13 +56,30 @@ def processTask(task, refDate):
     @type refDate: datetime.datetime
     """
     taskNeedSave=False
+    taskNeedLaunch=False
+
     if task.profile.stop_if_last_run_failed and task.last_run_failed:
         print "Don't run this task because last run failed"
         return
+
     if not task.next_run and task.isPlanned():
         task.computeNextRun(refDate)
         taskNeedSave=True
+
+    for event in task.targetEvent.filter(done=False):
+        if task in event.matchedTasks.all():
+            # This event is not for us, skipping
+            # It is still not mark done because another tasks wait it
+            continue
+        print "task receive event"
+        event.matchedTasks.add(task)
+        event.save()
+        taskNeedLaunch=True
+
     if task.next_run and task.next_run < refDate:
+        taskNeedLaunch=True
+
+    if taskNeedLaunch:
         print "Launch task %s" % task.name
         launchTask(task, refDate)
         # Update task for its next run
