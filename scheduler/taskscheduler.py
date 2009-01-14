@@ -29,7 +29,6 @@ from chronix.scheduler.models import LaunchedTask, TaskSchedulerNode
 
 SCHEDULE_INTERVAL=2 # In seconds
 
-@transaction.commit_manually
 def runTaskScheduler(taskSchedulerNode):
     """Main task scheduler loop.
     All enabled tasks are processed and launched if needed
@@ -50,6 +49,7 @@ def runTaskScheduler(taskSchedulerNode):
 @transaction.commit_on_success
 def processTask(task, refDate):
     """Process scheduling of a task. Launch it if needed.
+    @note: This function use transaction.commit_on_success
     @param task: the task to process
     @type task: chronix.core.Task
     @param refDate: the date used to schedule. Usually it's now

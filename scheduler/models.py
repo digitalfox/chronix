@@ -57,6 +57,7 @@ class Event(models.Model):
     done=models.BooleanField(default=False)
     targetTasks=models.ManyToManyField(Task, related_name="targetEvent") # Tasks targeted by the event
     matchedTasks=models.ManyToManyField(Task, related_name="matchedEvent", null=True, blank=True) # Log of tasks that really receive the event
+    #TODO; add parameter set that can overload task and task profile parameters
 
     def save(self):
         """Compute and cache the "done" state to save some time"""
