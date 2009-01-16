@@ -20,6 +20,13 @@ LAUNCHED_TASK_STATES=(("FIRED", "Fired up"),
                       ("SUCCESS", "Finished successfully"),
                       ("FAILURE", "Finished with failure"))
 
+TASK_SCHEDULER_STATES=(("RUNNING", "Currently running"),
+                       ("SHUTTING DOWN", "Shutting down"),
+                       ("STOPPED", "Stopped"),
+                       ("SUSPENDED", "Suspended"),
+                       ("KILLED", "Killed"))
+
+
 class TaskSchedulerNode(models.Model):
     """A taskSchedulerNode is in charge of computing tasks workplan
     A set of task is affected to a taskScheduler. A task can be affected
@@ -27,8 +34,8 @@ class TaskSchedulerNode(models.Model):
     One taskscheduler can feed one or more job scheduler"""
     name=models.CharField(max_length=200)
     tasks=models.ManyToManyField(Task, null=True, blank=True)
-    running=models.BooleanField(default=False)
     start_date=models.DateTimeField(null=True, blank=True)
+    state=models.CharField(max_length=20, choices=TASK_SCHEDULER_STATES)
 
     def __unicode__(self):
         return self.name

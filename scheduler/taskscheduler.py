@@ -14,6 +14,7 @@ from time import sleep
 import sys
 from os.path import abspath, dirname, join, pardir
 from datetime import datetime
+from threading import Thread
 
 ## Setup django envt & django imports
 sys.path.append(abspath(join(dirname(__file__), pardir)))
@@ -29,22 +30,82 @@ from chronix.scheduler.models import LaunchedTask, TaskSchedulerNode
 
 SCHEDULE_INTERVAL=2 # In seconds
 
-def runTaskScheduler(taskSchedulerNode):
-    """Main task scheduler loop.
-    All enabled tasks are processed and launched if needed
-    @param taskSchedulerNode: the task scheduler node used to filter tasks
-    @type taskSchedulerNode: TaskSchedulerNode
-    """
-    #TODO: add a smart way to stop or suspend the loop
-    while True:
-        now=datetime.now()
-        for task in taskSchedulerNode.tasks.filter(disable=False):
-            print "\n***********\nProcessing task %s" % task.name
+class TaskSchedulerThread(Thread):
+    """A thread running a task scheduler node"""
+    def __init__(self, name=None, node=None, daemonic=True):
+        """Scheduler name or object (node) must be provided. If both are provided node object
+        take precedence
+        @param name: the task scheduler node name
+        @type name: str or unicode
+        @param taskSchedulerNode: the task scheduler node used to filter tasks
+        @type taskSchedulerNode: TaskSchedulerNode
+        @param daemonic: define if thread is daemon (ie not dying with main process end). Default it True
+        """
+        self.name=name
+        self.taskSchedulerNode=node
+        Thread.__init__(self)
+        self.setDaemon(daemonic)
+
+    def run(self):
+        """Method executed when the thread object start() method is called"""
+        if not self.taskSchedulerNode and self.name:
             try:
-                processTask(task, now)
-            except Exception, e:
-                print "Got exception while processing task %s.\n%s" % (task.name, e)
-        sleep(SCHEDULE_INTERVAL)
+                self.taskSchedulerNode=TaskSchedulerNode.objects.get(name=self.name)
+            except TaskSchedulerNode.DoesNotExist:
+                print "No task scheduler with that name: %s" % self.name
+                return
+        elif not self.taskSchedulerNode and not self.name:
+            print "You must either give the scheduler node name or object"
+            return
+
+        print "Starting scheduler node %s" % self.name
+        self.taskSchedulerNode.state="RUNNING"
+        self.taskSchedulerNode.save()
+        self.loop()
+        print "Scheduler node %s is stopped" % self.name
+
+
+    def loop(self):
+        """Main task scheduler loop.
+        All enabled tasks are processed and launched if needed
+        """
+        while True:
+            print "\nTask Scheduler %s (%s)" % (self.taskSchedulerNode.name, self.taskSchedulerNode.state)
+            if self.taskSchedulerNode.state=="SHUTTING DOWN":
+                self.taskSchedulerNode.state="STOPPED"
+                self.taskSchedulerNode.save()
+                break
+            elif self.taskSchedulerNode.state=="SUSPENDED":
+                sleep(SCHEDULE_INTERVAL)
+                continue
+            elif self.taskSchedulerNode.state in ("KILLED", "STOPPED"):
+                print "This node should not run with such state %s" % self.taskSchedulerNode.state
+                break
+            else:
+                now=datetime.now()
+                for task in self.taskSchedulerNode.tasks.filter(disable=False):
+                    print "***********\nProcessing task %s" % task.name
+                    try:
+                        processTask(task, now)
+                    except Exception, e:
+                        print "Got exception while processing task %s.\n%s" % (task.name, e)
+                sleep(SCHEDULE_INTERVAL)
+
+    def shutdown(self):
+        """Shut down the task scheduler"""
+        self.taskSchedulerNode.state="SHUTTING DOWN"
+        self.taskSchedulerNode.save()
+
+    def suspend(self):
+        """Suspend the task scheduler"""
+        self.taskSchedulerNode.state="SUSPENDED"
+        self.taskSchedulerNode.save()
+
+    def resume(self):
+        """Resume from suspend the task scheduler"""
+        self.taskSchedulerNode.state="RUNNING"
+        self.taskSchedulerNode.save()
+
 
 @transaction.commit_on_success
 def processTask(task, refDate):
@@ -106,13 +167,18 @@ def launchTask(task, refDate):
 
 def main():
     #TODO: handle that properly in conf.
-    # For now, taskScheduler naem is receive as argv[1]
+    # For now, taskScheduler name is receive as argv[1]
+
     try:
-        taskSchedulerNode=TaskSchedulerNode.objects.get(name=sys.argv[1])
-        runTaskScheduler(taskSchedulerNode)
-    except TaskSchedulerNode.DoesNotExist:
-        print "This task scheduler does not exist."
-        sys.exit(1)
+        # test sequence
+        t=TaskSchedulerThread(name=sys.argv[1], daemonic=False)
+        t.start()
+        sleep(5)
+        t.suspend()
+        sleep(5)
+        t.resume()
+        sleep(5)
+        t.shutdown()
     except IndexError:
         print "Task Scheduler name must be given in argument"
         sys.exit(1)
