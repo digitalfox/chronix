@@ -32,36 +32,59 @@ SCHEDULE_INTERVAL=2 # In seconds
 
 class TaskSchedulerThread(Thread):
     """A thread running a task scheduler node"""
-    def __init__(self, name=None, node=None, daemonic=True):
+    def __init__(self, name=None, node=None, cleanup=False):
         """Scheduler name or object (node) must be provided. If both are provided node object
         take precedence
         @param name: the task scheduler node name
         @type name: str or unicode
         @param taskSchedulerNode: the task scheduler node used to filter tasks
         @type taskSchedulerNode: TaskSchedulerNode
-        @param daemonic: define if thread is daemon (ie not dying with main process end). Default it True
+        @param cleanup: Force state cleanup to recover from dirty state
+        @type cleanup: Bool
         """
-        self.name=name
         self.taskSchedulerNode=node
-        Thread.__init__(self)
-        self.setDaemon(daemonic)
 
-    def run(self):
-        """Method executed when the thread object start() method is called"""
-        if not self.taskSchedulerNode and self.name:
+        if not node and name:
             try:
                 self.taskSchedulerNode=TaskSchedulerNode.objects.get(name=self.name)
             except TaskSchedulerNode.DoesNotExist:
                 print "No task scheduler with that name: %s" % self.name
                 return
-        elif not self.taskSchedulerNode and not self.name:
+        elif not node and not self.name:
             print "You must either give the scheduler node name or object"
             return
 
-        print "Starting scheduler node %s" % self.name
+        if cleanup:
+            if self.taskSchedulerNode.state=="STOPPED":
+                print "Cleaning state not required, task scheduler was stopped properly"
+            else:
+                print "Cleaning up task scheduler state from %s to KILLED" % self.taskSchedulerNode.state
+                self.taskSchedulerNode.state="KILLED"
+                self.taskSchedulerNode.save()
+
+        Thread.__init__(self)
+
+    def run(self):
+        """Method executed when the thread object start() method is called"""
+        if self.taskSchedulerNode.state=="RUNNING":
+            print "Task scheduler seems to be already running according to database state"
+            print "Cannot start a second one"
+            return
+
+        if self.taskSchedulerNode.state=="KILLED":
+            print "Task scheduler was killed. Performing cleaning operation."
+            # Nothing to do for now.
+
+        if self.taskSchedulerNode.state=="SHUTTING DOWN":
+            print "Task scheduler seems shutting down according to database state"
+            print "Cannot task a second one"
+            return
+
+        print "Starting scheduler node %s" % self.taskSchedulerNode.name
+        self.taskSchedulerNode.start_date=datetime.now()
         self.taskSchedulerNode.resume()
         self.loop()
-        print "Scheduler node %s is stopped" % self.name
+        print "Scheduler node %s is stopped" % self.taskSchedulerNode.name
 
 
     def loop(self):
@@ -73,10 +96,10 @@ class TaskSchedulerThread(Thread):
             if self.taskSchedulerNode.state=="SHUTTING DOWN":
                 self.taskSchedulerNode.state="STOPPED"
                 self.taskSchedulerNode.save()
-                break
+                break # Exiting loop
             elif self.taskSchedulerNode.state=="SUSPENDED":
                 sleep(SCHEDULE_INTERVAL)
-                continue
+                continue # Do nothing
             elif self.taskSchedulerNode.state in ("KILLED", "STOPPED"):
                 print "This node should not run with such state %s" % self.taskSchedulerNode.state
                 break
@@ -156,7 +179,8 @@ def main():
     try:
         # test sequence
         node=TaskSchedulerNode.objects.get(name=sys.argv[1])
-        t=TaskSchedulerThread(node=node, daemonic=False)
+        t=TaskSchedulerThread(node=node, cleanup=True)
+        t.setDaemon(False) # Ease debug
         t.start()
         sleep(5)
         node.suspend()

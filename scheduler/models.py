@@ -42,18 +42,27 @@ class TaskSchedulerNode(models.Model):
 
     def shutdown(self):
         """Shut down the task scheduler"""
-        self.state="SHUTTING DOWN"
-        self.save()
+        if self.state in ("RUNNING", "SUSPENDED"):
+            self.state="SHUTTING DOWN"
+            self.save()
+        else:
+            print "Cannot shutdown a task scheduler in state %s" % self.state
 
     def suspend(self):
         """Suspend the task scheduler"""
-        self.state="SUSPENDED"
-        self.save()
+        if self.state=="RUNNING":
+            self.state="SUSPENDED"
+            self.save()
+        else:
+            print "Cannot suspend a task scheduler in state %s" % self.state
 
     def resume(self):
-        """Resume from suspend the task scheduler"""
-        self.state="RUNNING"
-        self.save()
+        """Resume the task scheduler"""
+        if self.state in ("STOPPED", "KILLED", "SUSPENDED"):
+            self.state="RUNNING"
+            self.save()
+        else:
+            print "Cannot resume a task scheduler in state %s" % self.state
 
 class LaunchedTask(models.Model):
     """A launched task represent a task that has been launched
