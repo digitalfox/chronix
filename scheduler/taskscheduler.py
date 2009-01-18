@@ -59,8 +59,7 @@ class TaskSchedulerThread(Thread):
             return
 
         print "Starting scheduler node %s" % self.name
-        self.taskSchedulerNode.state="RUNNING"
-        self.taskSchedulerNode.save()
+        self.taskSchedulerNode.resume()
         self.loop()
         print "Scheduler node %s is stopped" % self.name
 
@@ -90,21 +89,6 @@ class TaskSchedulerThread(Thread):
                     except Exception, e:
                         print "Got exception while processing task %s.\n%s" % (task.name, e)
                 sleep(SCHEDULE_INTERVAL)
-
-    def shutdown(self):
-        """Shut down the task scheduler"""
-        self.taskSchedulerNode.state="SHUTTING DOWN"
-        self.taskSchedulerNode.save()
-
-    def suspend(self):
-        """Suspend the task scheduler"""
-        self.taskSchedulerNode.state="SUSPENDED"
-        self.taskSchedulerNode.save()
-
-    def resume(self):
-        """Resume from suspend the task scheduler"""
-        self.taskSchedulerNode.state="RUNNING"
-        self.taskSchedulerNode.save()
 
 
 @transaction.commit_on_success
@@ -171,16 +155,21 @@ def main():
 
     try:
         # test sequence
-        t=TaskSchedulerThread(name=sys.argv[1], daemonic=False)
+        node=TaskSchedulerNode.objects.get(name=sys.argv[1])
+        t=TaskSchedulerThread(node=node, daemonic=False)
         t.start()
         sleep(5)
-        t.suspend()
+        node.suspend()
         sleep(5)
-        t.resume()
+        node.resume()
         sleep(5)
-        t.shutdown()
+        node.shutdown()
     except IndexError:
         print "Task Scheduler name must be given in argument"
+        sys.exit(1)
+    except TaskSchedulerNode.DoesNotExist:
+        print "No Task scheduler with such name"
+        print "Task scheduler availables: %s" % ", ".join([unicode(t) for t in TaskSchedulerNode.objects.all()])
         sys.exit(1)
 
 if __name__ == "__main__":

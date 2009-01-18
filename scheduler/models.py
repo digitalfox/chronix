@@ -40,6 +40,21 @@ class TaskSchedulerNode(models.Model):
     def __unicode__(self):
         return self.name
 
+    def shutdown(self):
+        """Shut down the task scheduler"""
+        self.state="SHUTTING DOWN"
+        self.save()
+
+    def suspend(self):
+        """Suspend the task scheduler"""
+        self.state="SUSPENDED"
+        self.save()
+
+    def resume(self):
+        """Resume from suspend the task scheduler"""
+        self.state="RUNNING"
+        self.save()
+
 class LaunchedTask(models.Model):
     """A launched task represent a task that has been launched
     A task can have multiple launched task that represent distinct launched
@@ -60,7 +75,7 @@ class Event(models.Model):
         a call to the event web service
     An event is always received by a job scheduler
     An event can be used to fire up unplanned tasks."""
-    creation_date=models.DateTimeField()
+    creation_date=models.DateTimeField(auto_now=True)
     done=models.BooleanField(default=False)
     targetTasks=models.ManyToManyField(Task, related_name="targetEvent") # Tasks targeted by the event
     matchedTasks=models.ManyToManyField(Task, related_name="matchedEvent", null=True, blank=True) # Log of tasks that really receive the event
