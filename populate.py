@@ -3,7 +3,7 @@
 
 # This file has been automatically generated, changes may be lost if you
 # go and generate it again. It was generated with the following command:
-# ./manage.py dumpscript core scheduler
+# ./manage.py dumpscript core scheduler jobrunner
 
 import datetime
 from decimal import Decimal
@@ -84,8 +84,8 @@ def run():
     core_task_1.chain = core_chain_1
     core_task_1.profile = core_taskprofile_1
     core_task_1.disable = False
-    core_task_1.next_run = datetime.datetime(2009, 1, 18, 20, 12, 47)
-    core_task_1.last_run = datetime.datetime(2009, 1, 18, 20, 12, 37)
+    core_task_1.next_run = datetime.datetime(2009, 1, 25, 14, 57, 17)
+    core_task_1.last_run = datetime.datetime(2009, 1, 25, 14, 57, 7)
     core_task_1.last_run_failed = False
     core_task_1.save()
 
@@ -93,7 +93,7 @@ def run():
 
     scheduler_taskschedulernode_1 = TaskSchedulerNode()
     scheduler_taskschedulernode_1.name = u'test'
-    scheduler_taskschedulernode_1.start_date = datetime.datetime(2009, 1, 18, 20, 12, 30, 685226)
+    scheduler_taskschedulernode_1.start_date = datetime.datetime(2009, 1, 25, 14, 57, 0, 387580)
     scheduler_taskschedulernode_1.state = u'STOPPED'
     scheduler_taskschedulernode_1.save()
 
@@ -102,14 +102,69 @@ def run():
     from chronix.scheduler.models import LaunchedTask
 
     scheduler_launchedtask_1 = LaunchedTask()
-    scheduler_launchedtask_1.planned_launch_date = datetime.datetime(2009, 1, 18, 20, 12, 37)
-    scheduler_launchedtask_1.real_launch_date = datetime.datetime(2009, 1, 18, 20, 12, 40, 705656)
-    scheduler_launchedtask_1.update_date = datetime.datetime(2009, 1, 18, 20, 12, 40, 708405)
+    scheduler_launchedtask_1.planned_launch_date = datetime.datetime(2009, 1, 18, 20, 20, 7)
+    scheduler_launchedtask_1.real_launch_date = datetime.datetime(2009, 1, 25, 14, 57, 0, 430451)
+    scheduler_launchedtask_1.update_date = datetime.datetime(2009, 1, 25, 14, 57, 0, 435468)
     scheduler_launchedtask_1.current_activity = None
     scheduler_launchedtask_1.state = u'FIRED'
     scheduler_launchedtask_1.task = core_task_1
     scheduler_launchedtask_1.save()
 
-    from chronix.scheduler.models import Event
+    scheduler_launchedtask_2 = LaunchedTask()
+    scheduler_launchedtask_2.planned_launch_date = datetime.datetime(2009, 1, 25, 14, 56, 57)
+    scheduler_launchedtask_2.real_launch_date = datetime.datetime(2009, 1, 25, 14, 57, 3, 950013)
+    scheduler_launchedtask_2.update_date = datetime.datetime(2009, 1, 25, 14, 57, 3, 953007)
+    scheduler_launchedtask_2.current_activity = None
+    scheduler_launchedtask_2.state = u'FIRED'
+    scheduler_launchedtask_2.task = core_task_1
+    scheduler_launchedtask_2.save()
 
+    scheduler_launchedtask_3 = LaunchedTask()
+    scheduler_launchedtask_3.planned_launch_date = datetime.datetime(2009, 1, 25, 14, 57, 7)
+    scheduler_launchedtask_3.real_launch_date = datetime.datetime(2009, 1, 25, 14, 57, 11, 445970)
+    scheduler_launchedtask_3.update_date = datetime.datetime(2009, 1, 25, 14, 57, 11, 455063)
+    scheduler_launchedtask_3.current_activity = None
+    scheduler_launchedtask_3.state = u'FIRED'
+    scheduler_launchedtask_3.task = core_task_1
+    scheduler_launchedtask_3.save()
+
+    from chronix.scheduler.models import TaskEvent
+
+
+    from chronix.jobrunner.models import JobRunnerNode
+
+    jobrunner_jobrunnernode_1 = JobRunnerNode()
+    jobrunner_jobrunnernode_1.name = u'test'
+    jobrunner_jobrunnernode_1.max_runner = 20
+    jobrunner_jobrunnernode_1.save()
+
+    from chronix.jobrunner.models import JobQueueAlgorithm
+
+    jobrunner_jobqueuealgorithm_1 = JobQueueAlgorithm()
+    jobrunner_jobqueuealgorithm_1.name = u'fifo'
+    jobrunner_jobqueuealgorithm_1.class_name = u'FifoJobQueue'
+    jobrunner_jobqueuealgorithm_1.save()
+
+    jobrunner_jobqueuealgorithm_2 = JobQueueAlgorithm()
+    jobrunner_jobqueuealgorithm_2.name = u'random'
+    jobrunner_jobqueuealgorithm_2.class_name = u'RandomJobQueue'
+    jobrunner_jobqueuealgorithm_2.save()
+
+    from chronix.jobrunner.models import JobQueueConfig
+
+    jobrunner_jobqueueconfig_1 = JobQueueConfig()
+    jobrunner_jobqueueconfig_1.name = u'toto'
+    jobrunner_jobqueueconfig_1.max_runner = 10
+    jobrunner_jobqueueconfig_1.node = jobrunner_jobrunnernode_1
+    jobrunner_jobqueueconfig_1.algorithm = jobrunner_jobqueuealgorithm_2
+    jobrunner_jobqueueconfig_1.param = u''
+    jobrunner_jobqueueconfig_1.save()
+
+    jobrunner_jobqueueconfig_2 = JobQueueConfig()
+    jobrunner_jobqueueconfig_2.name = u'lala'
+    jobrunner_jobqueueconfig_2.max_runner = 15
+    jobrunner_jobqueueconfig_2.node = jobrunner_jobrunnernode_1
+    jobrunner_jobqueueconfig_2.algorithm = jobrunner_jobqueuealgorithm_1
+    jobrunner_jobqueueconfig_2.param = u''
+    jobrunner_jobqueueconfig_2.save()
 

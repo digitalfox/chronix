@@ -75,26 +75,26 @@ class LaunchedTask(models.Model):
     state=models.CharField(max_length=20, choices=LAUNCHED_TASK_STATES)
     task=models.ForeignKey(Task)
 
-class Event(models.Model):
-    """An event is a communication message
-    An event can be emited by:
+class TaskEvent(models.Model):
+    """A Task event is a communication message used to manage tasks
+    A Task Event can be emited by:
         a task when starting or ending
-        a call to the event CLI
-        a call to the event API
-        a call to the event web service
-    An event is always received by a job scheduler
-    An event can be used to fire up unplanned tasks."""
+        a call to the chronix CLI
+        a call to the chronix API
+        a call to the task event web service
+    A task event is always received by a job scheduler
+    An task event can be used to fire up unplanned tasks."""
     creation_date=models.DateTimeField(auto_now=True)
     done=models.BooleanField(default=False)
-    targetTasks=models.ManyToManyField(Task, related_name="targetEvent") # Tasks targeted by the event
+    targetTasks=models.ManyToManyField(Task, related_name="targetEvent") # Tasks targeted by the task event
     matchedTasks=models.ManyToManyField(Task, related_name="matchedEvent", null=True, blank=True) # Log of tasks that really receive the event
     #TODO; add parameter set that can overload task and task profile parameters
 
     def save(self):
         """Compute and cache the "done" state to save some time"""
         #TODO: task count is too weak. We should targetTask=matchedTask
-        super(Event, self).save()
+        super(TaskEvent, self).save()
         if self.targetTasks.count()>0 and not self.done: # don't compute state if it is pointless
             if self.targetTasks.count()==self.matchedTasks.count():
                 self.done=True # Cache result.
-                super(Event, self).save()
+                super(TaskEvent, self).save()
