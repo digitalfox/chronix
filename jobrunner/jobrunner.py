@@ -59,14 +59,12 @@ class JobRunnerNodeThread(Thread):
 
         # Create job queues
         for qConfig in node.jobqueueconfig_set.all():
-            #TODO: make this dynamic
-            if qConfig.algorithm.name=="fifo":
-                queue=FifoJobQueue(qConfig)
-            elif qConfig.algorithm.name=="random":
-                queue=RandomJobQueue(qConfig)
-            else:
-                print "Oups, unknown queue algorithm"
-            self.queues.append(queue)
+            try:
+                qType=eval(qConfig.algorithm.class_name)
+                queue=qType(qConfig)
+                self.queues.append(queue)
+            except NameError, e:
+                print e
 
         # Create the job dispatcher that feed queues
         self.dispatcher=JobDispatcher(self.queues)
