@@ -151,7 +151,8 @@ class JobQueue:
         self.locker.acquire()
         job=None
         try:
-            job=self._get()
+            if not self.isEmpty():
+                job=self._get()
         finally:
             self.locker.release()
         return job
@@ -178,22 +179,21 @@ class FifoJobQueue(JobQueue):
     """A simple fifo job queue
     @todo: Make this class a plugin once plugin architecture defined"""
     def _get(self):
-        if not self.isEmpty():
-            job=self.jobs.pop(0)
-        else:
-            job=None
-        return job
+        return self.jobs.pop(0)
 
 class RandomJobQueue(JobQueue):
     """A simple random job queue.
     @todo: Make this class a plugin once plugin architecture defined"""
     def _get(self):
-        if not self.isEmpty():
-            r=random.randint(0, len(self)-1)
-            job=self.jobs.pop(r)
-        else:
-            job=None
-        return job
+        r=random.randint(0, len(self)-1)
+        return self.jobs.pop(r)
+
+class LifoJobQueue(JobQueue):
+    """A simple lifo (last in first out) queue
+    @todo: Make this class a plugin once plugin architecture defined"""
+    def _get(self):
+        return self.jobs.pop()
+
 
 def main():
     try:
