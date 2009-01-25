@@ -10,8 +10,8 @@ The admin interface is mostly intended for test and dev purpose.
 
 from django.contrib import admin
 
-from chronix.jobrunner.models import JobRunnerNode, JobQueueConfig, FifoJobQueueConfig
+from chronix.jobrunner.models import JobRunnerNode, JobQueueConfig, JobQueueAlgorithm
 
 admin.site.register(JobRunnerNode)
 admin.site.register(JobQueueConfig)
-admin.site.register(FifoJobQueueConfig)
+admin.site.register(JobQueueAlgorithm)

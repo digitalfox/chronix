@@ -14,6 +14,7 @@ from time import sleep
 from threading import Lock, Thread
 import sys
 from os.path import abspath, dirname, join, pardir
+import random
 
 ## Setup django envt & django imports
 sys.path.append(abspath(join(dirname(__file__), pardir)))
@@ -58,9 +59,13 @@ class JobRunnerNodeThread(Thread):
 
         # Create job queues
         for qConfig in node.jobqueueconfig_set.all():
-            #TODO: determine real model (via contenttype)
-            # For now, assuming everything is fifoqueue
-            queue=FifoJobQueue(qConfig)
+            #TODO: make this dynamic
+            if qConfig.algorithm.name=="fifo":
+                queue=FifoJobQueue(qConfig)
+            elif qConfig.algorithm.name=="random":
+                queue=RandomJobQueue(qConfig)
+            else:
+                print "Oups, unknown queue algorithm"
             self.queues.append(queue)
 
         # Create the job dispatcher that feed queues
@@ -172,6 +177,19 @@ class FifoJobQueue(JobQueue):
 
     def __len__(self):
         return len(self.jobs)
+
+class RandomJobQueue(FifoJobQueue):
+    """A simple random job queue.
+    @todo: Make this class a plugin once plugin architecture defined"""
+    def get(self):
+        self.locker.acquire()
+        if not self.isEmpty():
+            r=random.randint(0, len(self)-1)
+            job=self.jobs.pop(r)
+        else:
+            job=None
+        self.locker.release()
+        return job
 
 def main():
     try:
