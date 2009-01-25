@@ -11,10 +11,9 @@ Jobrunner is composed of two parts
 
 # Python imports
 from time import sleep
-from threading import Lock, Thread
+from threading import Thread
 import sys
 from os.path import abspath, dirname, join, pardir
-import random
 
 ## Setup django envt & django imports
 sys.path.append(abspath(join(dirname(__file__), pardir)))
@@ -60,11 +59,16 @@ class JobRunnerNodeThread(Thread):
         # Create job queues
         for qConfig in node.jobqueueconfig_set.all():
             try:
-                qType=eval(qConfig.algorithm.class_name)
+                # Try to import the plugin
+                m=__import__("chronix.plugins.jobqueue."+qConfig.algorithm.class_name.split(".")[0])
+                # Create class
+                qType=eval("m.plugins.jobqueue."+qConfig.algorithm.class_name)
                 queue=qType(qConfig)
                 self.queues.append(queue)
-            except NameError, e:
+            except (AttributeError, NameError, ImportError), e:
+                print "Cannot load plugin %s for queue %s" % (qConfig.algorithm.class_name, qConfig.name)
                 print e
+                print "Queue %s is disabled" % qConfig.name
 
         # Create the job dispatcher that feed queues
         self.dispatcher=JobDispatcher(self.queues)
@@ -133,66 +137,6 @@ class JobRunner(Thread):
         # Fake job running
         import random
         sleep(random.randint(15, 30))
-
-class JobQueue:
-    """A generic job queue - every JobQueue plugin inherit from this class"""
-    def __init__(self, qConfig):
-        """@param jobQueueConfig: a JobQueueConfig object"""
-        self.qConfig=qConfig
-        self.locker=Lock()
-        self.jobs=[]
-
-    def add(self, job):
-        self.locker.acquire()
-        self.jobs.append(job)
-        self.locker.release()
-
-    def get(self):
-        self.locker.acquire()
-        job=None
-        try:
-            if not self.isEmpty():
-                job=self._get()
-        finally:
-            self.locker.release()
-        return job
-
-    def clear(self):
-        self.locker.acquire()
-        self.jobs=[]
-        self.locker.release()
-
-    def isEmpty(self):
-        if len(self)==0:
-            return True
-        else:
-            return False
-
-    def __len__(self):
-        return len(self.jobs)
-
-    def _get(self):
-        """This method must be overriden by subclass"""
-        raise NotImplementedError
-
-class FifoJobQueue(JobQueue):
-    """A simple fifo job queue
-    @todo: Make this class a plugin once plugin architecture defined"""
-    def _get(self):
-        return self.jobs.pop(0)
-
-class RandomJobQueue(JobQueue):
-    """A simple random job queue.
-    @todo: Make this class a plugin once plugin architecture defined"""
-    def _get(self):
-        r=random.randint(0, len(self)-1)
-        return self.jobs.pop(r)
-
-class LifoJobQueue(JobQueue):
-    """A simple lifo (last in first out) queue
-    @todo: Make this class a plugin once plugin architecture defined"""
-    def _get(self):
-        return self.jobs.pop()
 
 
 def main():
