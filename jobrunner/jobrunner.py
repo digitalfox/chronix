@@ -140,12 +140,6 @@ class JobQueue:
         """@param jobQueueConfig: a JobQueueConfig object"""
         self.qConfig=qConfig
         self.locker=Lock()
-
-class FifoJobQueue(JobQueue):
-    """A simple fifo job queue
-    @todo: Make this class a plugin once plugin architecture defined"""
-    def __init__(self, qConfig):
-        JobQueue.__init__(self, qConfig)
         self.jobs=[]
 
     def add(self, job):
@@ -155,11 +149,11 @@ class FifoJobQueue(JobQueue):
 
     def get(self):
         self.locker.acquire()
-        if not self.isEmpty():
-            job=self.jobs.pop(0)
-        else:
-            job=None
-        self.locker.release()
+        job=None
+        try:
+            job=self._get()
+        finally:
+            self.locker.release()
         return job
 
     def clear(self):
@@ -176,17 +170,29 @@ class FifoJobQueue(JobQueue):
     def __len__(self):
         return len(self.jobs)
 
-class RandomJobQueue(FifoJobQueue):
+    def _get(self):
+        """This method must be overriden by subclass"""
+        raise NotImplementedError
+
+class FifoJobQueue(JobQueue):
+    """A simple fifo job queue
+    @todo: Make this class a plugin once plugin architecture defined"""
+    def _get(self):
+        if not self.isEmpty():
+            job=self.jobs.pop(0)
+        else:
+            job=None
+        return job
+
+class RandomJobQueue(JobQueue):
     """A simple random job queue.
     @todo: Make this class a plugin once plugin architecture defined"""
-    def get(self):
-        self.locker.acquire()
+    def _get(self):
         if not self.isEmpty():
             r=random.randint(0, len(self)-1)
             job=self.jobs.pop(r)
         else:
             job=None
-        self.locker.release()
         return job
 
 def main():
