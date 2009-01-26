@@ -23,6 +23,7 @@ setup_environ(settings)
 
 # Chronix imports
 from chronix.jobrunner.models import JobRunnerNode
+from chronix.plugins.helpers import loadPlugin, ChronixPluginException
 
 RUNNER_INTERVAL=2 # In seconds
 
@@ -59,16 +60,12 @@ class JobRunnerNodeThread(Thread):
         # Create job queues
         for qConfig in node.jobqueueconfig_set.all():
             try:
-                # Try to import the plugin
-                m=__import__("chronix.plugins.jobqueue."+qConfig.algorithm.class_name.split(".")[0])
-                # Create class
-                qType=eval("m.plugins.jobqueue."+qConfig.algorithm.class_name)
+                qType=loadPlugin("jobqueue", qConfig.algorithm.class_name)
                 queue=qType(qConfig)
                 self.queues.append(queue)
-            except (AttributeError, NameError, ImportError), e:
-                print "Cannot load plugin %s for queue %s" % (qConfig.algorithm.class_name, qConfig.name)
+            except ChronixPluginException, e:
                 print e
-                print "Queue %s is disabled" % qConfig.name
+                print "Queue %s disabled" % qConfig.name
 
         # Create the job dispatcher that feed queues
         self.dispatcher=JobDispatcher(self.queues)
