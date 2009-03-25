@@ -10,10 +10,11 @@ Jobrunner is composed of two parts
 """
 
 # Python imports
-from time import sleep
+from time import sleep, strftime
 from threading import Thread
 import sys
 from os.path import abspath, dirname, join, pardir
+from subprocess import Popen
 
 ## Setup django envt & django imports
 sys.path.append(abspath(join(dirname(__file__), pardir)))
@@ -25,7 +26,11 @@ setup_environ(settings)
 from chronix.jobrunner.models import JobRunnerNode
 from chronix.plugins.helpers import loadPlugin, ChronixPluginException
 
+#TODO: move that in database or file
 RUNNER_INTERVAL=2 # In seconds
+PROCESS_POLLING_INTERVAL=1 # In seconds
+JOB_STDOUT_DIR="stdout" # relative path is a bad idea
+
 
 class JobDispatcher(Thread):
     """A thread running the job dispatcher"""
@@ -45,8 +50,8 @@ class JobDispatcher(Thread):
         i=0
         while not self.stop:
             i+=1
-            self.queues[0].add("lala %s" % i)  # Fake job
-            self.queues[1].add("toto %s" % i)  # Fake job
+            self.queues[0].add(Job("lala %s" % i, "echo lala %s;sleep 10" % i))  # Fake job
+            self.queues[1].add(Job("toto %s" % i, "echo toto %s;sleep 5;balbla" % i))  # Fake job
             sleep(0.3)
 
 class JobRunnerNodeThread(Thread):
@@ -121,20 +126,44 @@ class JobRunnerNodeThread(Thread):
             sleep(RUNNER_INTERVAL)
 
 
+class Job:
+    """Fake job structure. Real one will be done once
+    more work have been done on repo and activity resolver modules"""
+    def __init__(self, name, prog, env=dict()):
+        self.name=name
+        self.prog=prog
+        self.env=env
+
 class JobRunner(Thread):
     """A thread running a job runner"""
     def __init__(self, job, queue):
+        Thread.__init__(self)
         self.job=job
         self.queue=queue # Needed to check max runner for each queue
-        Thread.__init__(self)
+        self.process=None # The process manage by this runner (Popen object)
+        stdoutName="%s-%s-%s-%s" % (queue.qConfig.node.name, queue.qConfig.name, self.getName(), strftime("%Y%m%d%H%M%S")) 
+        self.stdout=file(join(JOB_STDOUT_DIR, stdoutName), "w") # The process stdout on disk
 
     def run(self):
-        print "Runner is executing job %s" % self.job
-        #TODO: notify the activity resolver of job status (start, end)
-        # Fake job running
-        import random
-        sleep(random.randint(15, 30))
+        """Method executed when the thread object start() method is called"""
+        print "Runner is executing job %s" % self.job.name
+        self.process=Popen(self.job.prog, stdout=self.stdout, stderr=self.stdout, shell=True, env=self.job.env)
+        self._wait()
+        print "Runner finished to execute job %s with rc %s" % (self.job.name, self.process.returncode)
+        # Close stdout file
+        self.stdout.close()
+        self._notify()
 
+    def _wait(self):
+        """Wait process ending"""
+        while True:
+            if self.process.poll() is not None:
+                break
+            sleep(PROCESS_POLLING_INTERVAL)
+
+    def _notify(self):
+        """Notify the job is finished"""
+        pass  #Nothing for now. Shoud be connected to activity resolver
 
 def main():
     try:
